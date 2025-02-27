@@ -118,6 +118,7 @@ Remember to follow the conversation flow rules above.
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { createReadStream } from "fs";
 var MessageManager = class {
   constructor(client, runtime, botUserId) {
     this.processedEvents = /* @__PURE__ */ new Set();
@@ -282,16 +283,35 @@ var MessageManager = class {
           elizaLogger.warn(`No file data found for attachment id: ${attachmentId}`);
           continue;
         }
-        elizaLogger.log("Uploading text file...");
-        const uploadResult = await this.client.filesUploadV2({
-          channels: event.channel,
-          thread_ts: event.thread_ts,
-          content: fileData,
-          filename: "text.txt",
-          filetype: "text/plain",
-          initial_comment: "",
-          snippet_type: "markdown"
-        });
+        const imageRegex = /\.(png|jpe?g|gif|bmp|tiff|webp)$/i;
+        const isImage = imageRegex.test(fileData);
+        console.log("`File` data:", isImage, fileData);
+        let uploadParams;
+        if (isImage) {
+          elizaLogger.log("Uploading image file...");
+          uploadParams = {
+            channels: event.channel,
+            thread_ts: event.thread_ts,
+            filename: ".",
+            // Use attachment ID as filename
+            initial_comment: "Uploaded image",
+            file: createReadStream(fileData)
+            // Read file from disk
+          };
+        } else {
+          elizaLogger.log("Uploading text file...");
+          uploadParams = {
+            channels: event.channel,
+            thread_ts: event.thread_ts,
+            filename: "text.txt",
+            filetype: "text/plain",
+            content: fileData,
+            // Direct text upload
+            initial_comment: "",
+            snippet_type: "markdown"
+          };
+        }
+        const uploadResult = await this.client.filesUploadV2(uploadParams);
         elizaLogger.log("File uploaded successfully:", uploadResult);
       } catch (error) {
         elizaLogger.error(`Error uploading file for attachment ${attachmentId}:`, error);
@@ -498,7 +518,7 @@ var MessageManager = class {
 // src/environment.ts
 import { elizaLogger as elizaLogger2 } from "@elizaos/core";
 
-// ../../node_modules/zod/lib/index.mjs
+// node_modules/.pnpm/zod@3.24.2/node_modules/zod/lib/index.mjs
 var util;
 (function(util2) {
   util2.assertEqual = (val) => val;
@@ -4325,16 +4345,32 @@ ZodReadonly.create = (type, params) => {
     ...processCreateParams(params)
   });
 };
-function custom(check, params = {}, fatal) {
+function cleanParams(params, data) {
+  const p = typeof params === "function" ? params(data) : typeof params === "string" ? { message: params } : params;
+  const p2 = typeof p === "string" ? { message: p } : p;
+  return p2;
+}
+function custom(check, _params = {}, fatal) {
   if (check)
     return ZodAny.create().superRefine((data, ctx) => {
       var _a, _b;
-      if (!check(data)) {
-        const p = typeof params === "function" ? params(data) : typeof params === "string" ? { message: params } : params;
-        const _fatal = (_b = (_a = p.fatal) !== null && _a !== void 0 ? _a : fatal) !== null && _b !== void 0 ? _b : true;
-        const p2 = typeof p === "string" ? { message: p } : p;
-        ctx.addIssue({ code: "custom", ...p2, fatal: _fatal });
+      const r = check(data);
+      if (r instanceof Promise) {
+        return r.then((r2) => {
+          var _a2, _b2;
+          if (!r2) {
+            const params = cleanParams(_params, data);
+            const _fatal = (_b2 = (_a2 = params.fatal) !== null && _a2 !== void 0 ? _a2 : fatal) !== null && _b2 !== void 0 ? _b2 : true;
+            ctx.addIssue({ code: "custom", ...params, fatal: _fatal });
+          }
+        });
       }
+      if (!r) {
+        const params = cleanParams(_params, data);
+        const _fatal = (_b = (_a = params.fatal) !== null && _a !== void 0 ? _a : fatal) !== null && _b !== void 0 ? _b : true;
+        ctx.addIssue({ code: "custom", ...params, fatal: _fatal });
+      }
+      return;
     });
   return ZodAny.create();
 }

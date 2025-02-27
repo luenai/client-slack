@@ -20,6 +20,7 @@ import type { IAgentRuntime } from "@elizaos/core";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import {createReadStream} from "fs";
 
 export class MessageManager {
     private client: WebClient;
@@ -235,27 +236,51 @@ export class MessageManager {
         if (attachments==null || attachments.length==0) {
             return;
         }
-
+    
         for (const attachmentId of attachments) {
             try {
                 // Retrieve file data from the runtime's cache manager.
-                const fileData = await this.runtime.cacheManager.get(attachmentId);
+                const fileData = await this.runtime.cacheManager.get(attachmentId) as string;
                 if (!fileData) {
                     elizaLogger.warn(`No file data found for attachment id: ${attachmentId}`);
                     continue;
                 }
-
-                elizaLogger.log("Uploading text file...");
-                const uploadResult = await this.client.filesUploadV2({
-                    channels: event.channel,
-                    thread_ts: event.thread_ts,
-                    content: fileData as string,
-                    filename: "text.txt",
-                    filetype: "text/plain",
-                    initial_comment: "",
-                    snippet_type: "markdown"
-                });
+    
+                // Determine if fileData is a file path (image) or text
+                const imageRegex = /\.(png|jpe?g|gif|bmp|tiff|webp)$/i; // Case-insensitive check
+                const isImage = imageRegex.test(fileData);
+                
+                console.log("`File` data:",isImage, fileData);
+                let uploadParams: any;
+    
+                if (isImage) {
+                    // Upload as an image from file path
+                    elizaLogger.log("Uploading image file...");
+                    uploadParams = {
+                        channels: event.channel,
+                        thread_ts: event.thread_ts,
+                        filename: '.', // Use attachment ID as filename
+                        initial_comment: "Uploaded image",
+                        file: createReadStream(fileData), // Read file from disk
+                    };
+                } else {
+                    // Upload as a text file
+                    elizaLogger.log("Uploading text file...");
+                    uploadParams = {
+                        channels: event.channel,
+                        thread_ts: event.thread_ts,
+                        filename: "text.txt",
+                        filetype: "text/plain",
+                        content: fileData, // Direct text upload
+                        initial_comment: "",
+                        snippet_type: "markdown"
+                    };
+                }
+    
+                // Upload file to Slack
+                const uploadResult = await this.client.filesUploadV2(uploadParams);
                 elizaLogger.log("File uploaded successfully:", uploadResult);
+    
             } catch (error) {
                 elizaLogger.error(`Error uploading file for attachment ${attachmentId}:`, error);
             }
