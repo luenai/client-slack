@@ -120,10 +120,13 @@ import fs from "fs";
 import os from "os";
 import { createReadStream } from "fs";
 var MessageManager = class {
+  client;
+  runtime;
+  botUserId;
+  processedEvents = /* @__PURE__ */ new Set();
+  messageProcessingLock = /* @__PURE__ */ new Set();
+  processedMessages = /* @__PURE__ */ new Map();
   constructor(client, runtime, botUserId) {
-    this.processedEvents = /* @__PURE__ */ new Set();
-    this.messageProcessingLock = /* @__PURE__ */ new Set();
-    this.processedMessages = /* @__PURE__ */ new Map();
     console.log("\u{1F4F1} Initializing MessageManager...");
     this.client = client;
     this.runtime = runtime;
@@ -518,7 +521,7 @@ var MessageManager = class {
 // src/environment.ts
 import { elizaLogger as elizaLogger2 } from "@elizaos/core";
 
-// node_modules/.pnpm/zod@3.24.2/node_modules/zod/lib/index.mjs
+// ../../node_modules/.pnpm/zod@3.24.4/node_modules/zod/lib/index.mjs
 var util;
 (function(util2) {
   util2.assertEqual = (val) => val;
@@ -672,7 +675,7 @@ var quotelessJson = (obj) => {
   const json = JSON.stringify(obj, null, 2);
   return json.replace(/"([^"]+)":/g, "$1:");
 };
-var ZodError = class extends Error {
+var ZodError = class _ZodError extends Error {
   get errors() {
     return this.issues;
   }
@@ -731,7 +734,7 @@ var ZodError = class extends Error {
     return fieldErrors;
   }
   static assert(value) {
-    if (!(value instanceof ZodError)) {
+    if (!(value instanceof _ZodError)) {
       throw new Error(`Not a ZodError: ${value}`);
     }
   }
@@ -915,7 +918,7 @@ function addIssueToContext(ctx, issueData) {
   });
   ctx.common.issues.push(issue);
 }
-var ParseStatus = class {
+var ParseStatus = class _ParseStatus {
   constructor() {
     this.value = "valid";
   }
@@ -948,7 +951,7 @@ var ParseStatus = class {
         value
       });
     }
-    return ParseStatus.mergeObjectSync(status, syncPairs);
+    return _ParseStatus.mergeObjectSync(status, syncPairs);
   }
   static mergeObjectSync(status, pairs) {
     const finalObject = {};
@@ -979,19 +982,14 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 function __classPrivateFieldGet(receiver, state, kind, f) {
-  if (kind === "a" && !f)
-    throw new TypeError("Private accessor was defined without a getter");
-  if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver))
-    throw new TypeError("Cannot read private member from an object whose class did not declare it");
+  if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+  if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
   return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 }
 function __classPrivateFieldSet(receiver, state, value, kind, f) {
-  if (kind === "m")
-    throw new TypeError("Private method is not writable");
-  if (kind === "a" && !f)
-    throw new TypeError("Private accessor was defined without a setter");
-  if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver))
-    throw new TypeError("Cannot write private member to an object whose class did not declare it");
+  if (kind === "m") throw new TypeError("Private method is not writable");
+  if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+  if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
   return kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value), value;
 }
 var errorUtil;
@@ -1367,13 +1365,14 @@ var base64urlRegex = /^([0-9a-zA-Z-_]{4})*(([0-9a-zA-Z-_]{2}(==)?)|([0-9a-zA-Z-_
 var dateRegexSource = `((\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-((0[13578]|1[02])-(0[1-9]|[12]\\d|3[01])|(0[469]|11)-(0[1-9]|[12]\\d|30)|(02)-(0[1-9]|1\\d|2[0-8])))`;
 var dateRegex = new RegExp(`^${dateRegexSource}$`);
 function timeRegexSource(args) {
-  let regex = `([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d`;
+  let secondsRegexSource = `[0-5]\\d`;
   if (args.precision) {
-    regex = `${regex}\\.\\d{${args.precision}}`;
+    secondsRegexSource = `${secondsRegexSource}\\.\\d{${args.precision}}`;
   } else if (args.precision == null) {
-    regex = `${regex}(\\.\\d+)?`;
+    secondsRegexSource = `${secondsRegexSource}(\\.\\d+)?`;
   }
-  return regex;
+  const secondsQuantifier = args.precision ? "+" : "?";
+  return `([01]\\d|2[0-3]):[0-5]\\d(:${secondsRegexSource})${secondsQuantifier}`;
 }
 function timeRegex(args) {
   return new RegExp(`^${timeRegexSource(args)}$`);
@@ -1423,7 +1422,7 @@ function isValidCidr(ip, version) {
   }
   return false;
 }
-var ZodString = class extends ZodType {
+var ZodString = class _ZodString extends ZodType {
   _parse(input) {
     if (this._def.coerce) {
       input.data = String(input.data);
@@ -1733,7 +1732,7 @@ var ZodString = class extends ZodType {
     });
   }
   _addCheck(check) {
-    return new ZodString({
+    return new _ZodString({
       ...this._def,
       checks: [...this._def.checks, check]
     });
@@ -1876,19 +1875,19 @@ var ZodString = class extends ZodType {
     return this.min(1, errorUtil.errToObj(message));
   }
   trim() {
-    return new ZodString({
+    return new _ZodString({
       ...this._def,
       checks: [...this._def.checks, { kind: "trim" }]
     });
   }
   toLowerCase() {
-    return new ZodString({
+    return new _ZodString({
       ...this._def,
       checks: [...this._def.checks, { kind: "toLowerCase" }]
     });
   }
   toUpperCase() {
-    return new ZodString({
+    return new _ZodString({
       ...this._def,
       checks: [...this._def.checks, { kind: "toUpperCase" }]
     });
@@ -1979,7 +1978,7 @@ function floatSafeRemainder(val, step) {
   const stepInt = parseInt(step.toFixed(decCount).replace(".", ""));
   return valInt % stepInt / Math.pow(10, decCount);
 }
-var ZodNumber = class extends ZodType {
+var ZodNumber = class _ZodNumber extends ZodType {
   constructor() {
     super(...arguments);
     this.min = this.gte;
@@ -2080,7 +2079,7 @@ var ZodNumber = class extends ZodType {
     return this.setLimit("max", value, false, errorUtil.toString(message));
   }
   setLimit(kind, value, inclusive, message) {
-    return new ZodNumber({
+    return new _ZodNumber({
       ...this._def,
       checks: [
         ...this._def.checks,
@@ -2094,7 +2093,7 @@ var ZodNumber = class extends ZodType {
     });
   }
   _addCheck(check) {
-    return new ZodNumber({
+    return new _ZodNumber({
       ...this._def,
       checks: [...this._def.checks, check]
     });
@@ -2210,7 +2209,7 @@ ZodNumber.create = (params) => {
     ...processCreateParams(params)
   });
 };
-var ZodBigInt = class extends ZodType {
+var ZodBigInt = class _ZodBigInt extends ZodType {
   constructor() {
     super(...arguments);
     this.min = this.gte;
@@ -2295,7 +2294,7 @@ var ZodBigInt = class extends ZodType {
     return this.setLimit("max", value, false, errorUtil.toString(message));
   }
   setLimit(kind, value, inclusive, message) {
-    return new ZodBigInt({
+    return new _ZodBigInt({
       ...this._def,
       checks: [
         ...this._def.checks,
@@ -2309,7 +2308,7 @@ var ZodBigInt = class extends ZodType {
     });
   }
   _addCheck(check) {
-    return new ZodBigInt({
+    return new _ZodBigInt({
       ...this._def,
       checks: [...this._def.checks, check]
     });
@@ -2408,7 +2407,7 @@ ZodBoolean.create = (params) => {
     ...processCreateParams(params)
   });
 };
-var ZodDate = class extends ZodType {
+var ZodDate = class _ZodDate extends ZodType {
   _parse(input) {
     if (this._def.coerce) {
       input.data = new Date(input.data);
@@ -2469,7 +2468,7 @@ var ZodDate = class extends ZodType {
     };
   }
   _addCheck(check) {
-    return new ZodDate({
+    return new _ZodDate({
       ...this._def,
       checks: [...this._def.checks, check]
     });
@@ -2648,7 +2647,7 @@ ZodVoid.create = (params) => {
     ...processCreateParams(params)
   });
 };
-var ZodArray = class extends ZodType {
+var ZodArray = class _ZodArray extends ZodType {
   _parse(input) {
     const { ctx, status } = this._processInputParams(input);
     const def = this._def;
@@ -2718,19 +2717,19 @@ var ZodArray = class extends ZodType {
     return this._def.type;
   }
   min(minLength, message) {
-    return new ZodArray({
+    return new _ZodArray({
       ...this._def,
       minLength: { value: minLength, message: errorUtil.toString(message) }
     });
   }
   max(maxLength, message) {
-    return new ZodArray({
+    return new _ZodArray({
       ...this._def,
       maxLength: { value: maxLength, message: errorUtil.toString(message) }
     });
   }
   length(len, message) {
-    return new ZodArray({
+    return new _ZodArray({
       ...this._def,
       exactLength: { value: len, message: errorUtil.toString(message) }
     });
@@ -2775,7 +2774,7 @@ function deepPartialify(schema) {
     return schema;
   }
 }
-var ZodObject = class extends ZodType {
+var ZodObject = class _ZodObject extends ZodType {
   constructor() {
     super(...arguments);
     this._cached = null;
@@ -2837,8 +2836,7 @@ var ZodObject = class extends ZodType {
           });
           status.dirty();
         }
-      } else if (unknownKeys === "strip")
-        ;
+      } else if (unknownKeys === "strip") ;
       else {
         throw new Error(`Internal ZodObject error: invalid unknownKeys value.`);
       }
@@ -2881,7 +2879,7 @@ var ZodObject = class extends ZodType {
   }
   strict(message) {
     errorUtil.errToObj;
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       unknownKeys: "strict",
       ...message !== void 0 ? {
@@ -2900,13 +2898,13 @@ var ZodObject = class extends ZodType {
     });
   }
   strip() {
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       unknownKeys: "strip"
     });
   }
   passthrough() {
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       unknownKeys: "passthrough"
     });
@@ -2929,7 +2927,7 @@ var ZodObject = class extends ZodType {
   //     }) as any;
   //   };
   extend(augmentation) {
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       shape: () => ({
         ...this._def.shape(),
@@ -2943,7 +2941,7 @@ var ZodObject = class extends ZodType {
    * upgrade if you are experiencing issues.
    */
   merge(merging) {
-    const merged = new ZodObject({
+    const merged = new _ZodObject({
       unknownKeys: merging._def.unknownKeys,
       catchall: merging._def.catchall,
       shape: () => ({
@@ -3014,7 +3012,7 @@ var ZodObject = class extends ZodType {
   //   return merged;
   // }
   catchall(index) {
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       catchall: index
     });
@@ -3026,7 +3024,7 @@ var ZodObject = class extends ZodType {
         shape[key] = this.shape[key];
       }
     });
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       shape: () => shape
     });
@@ -3038,7 +3036,7 @@ var ZodObject = class extends ZodType {
         shape[key] = this.shape[key];
       }
     });
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       shape: () => shape
     });
@@ -3059,7 +3057,7 @@ var ZodObject = class extends ZodType {
         newShape[key] = fieldSchema.optional();
       }
     });
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       shape: () => newShape
     });
@@ -3078,7 +3076,7 @@ var ZodObject = class extends ZodType {
         newShape[key] = newField;
       }
     });
-    return new ZodObject({
+    return new _ZodObject({
       ...this._def,
       shape: () => newShape
     });
@@ -3236,7 +3234,7 @@ var getDiscriminator = (type) => {
     return [];
   }
 };
-var ZodDiscriminatedUnion = class extends ZodType {
+var ZodDiscriminatedUnion = class _ZodDiscriminatedUnion extends ZodType {
   _parse(input) {
     const { ctx } = this._processInputParams(input);
     if (ctx.parsedType !== ZodParsedType.object) {
@@ -3303,7 +3301,7 @@ var ZodDiscriminatedUnion = class extends ZodType {
         optionsMap.set(value, type);
       }
     }
-    return new ZodDiscriminatedUnion({
+    return new _ZodDiscriminatedUnion({
       typeName: ZodFirstPartyTypeKind.ZodDiscriminatedUnion,
       discriminator,
       options,
@@ -3403,7 +3401,7 @@ ZodIntersection.create = (left, right, params) => {
     ...processCreateParams(params)
   });
 };
-var ZodTuple = class extends ZodType {
+var ZodTuple = class _ZodTuple extends ZodType {
   _parse(input) {
     const { status, ctx } = this._processInputParams(input);
     if (ctx.parsedType !== ZodParsedType.array) {
@@ -3453,7 +3451,7 @@ var ZodTuple = class extends ZodType {
     return this._def.items;
   }
   rest(rest) {
-    return new ZodTuple({
+    return new _ZodTuple({
       ...this._def,
       rest
     });
@@ -3470,7 +3468,7 @@ ZodTuple.create = (schemas, params) => {
     ...processCreateParams(params)
   });
 };
-var ZodRecord = class extends ZodType {
+var ZodRecord = class _ZodRecord extends ZodType {
   get keySchema() {
     return this._def.keyType;
   }
@@ -3508,14 +3506,14 @@ var ZodRecord = class extends ZodType {
   }
   static create(first, second, third) {
     if (second instanceof ZodType) {
-      return new ZodRecord({
+      return new _ZodRecord({
         keyType: first,
         valueType: second,
         typeName: ZodFirstPartyTypeKind.ZodRecord,
         ...processCreateParams(third)
       });
     }
-    return new ZodRecord({
+    return new _ZodRecord({
       keyType: ZodString.create(),
       valueType: first,
       typeName: ZodFirstPartyTypeKind.ZodRecord,
@@ -3589,7 +3587,7 @@ ZodMap.create = (keyType, valueType, params) => {
     ...processCreateParams(params)
   });
 };
-var ZodSet = class extends ZodType {
+var ZodSet = class _ZodSet extends ZodType {
   _parse(input) {
     const { status, ctx } = this._processInputParams(input);
     if (ctx.parsedType !== ZodParsedType.set) {
@@ -3647,13 +3645,13 @@ var ZodSet = class extends ZodType {
     }
   }
   min(minSize, message) {
-    return new ZodSet({
+    return new _ZodSet({
       ...this._def,
       minSize: { value: minSize, message: errorUtil.toString(message) }
     });
   }
   max(maxSize, message) {
-    return new ZodSet({
+    return new _ZodSet({
       ...this._def,
       maxSize: { value: maxSize, message: errorUtil.toString(message) }
     });
@@ -3674,7 +3672,7 @@ ZodSet.create = (valueType, params) => {
     ...processCreateParams(params)
   });
 };
-var ZodFunction = class extends ZodType {
+var ZodFunction = class _ZodFunction extends ZodType {
   constructor() {
     super(...arguments);
     this.validate = this.implement;
@@ -3761,13 +3759,13 @@ var ZodFunction = class extends ZodType {
     return this._def.returns;
   }
   args(...items) {
-    return new ZodFunction({
+    return new _ZodFunction({
       ...this._def,
       args: ZodTuple.create(items).rest(ZodUnknown.create())
     });
   }
   returns(returnType) {
-    return new ZodFunction({
+    return new _ZodFunction({
       ...this._def,
       returns: returnType
     });
@@ -3781,7 +3779,7 @@ var ZodFunction = class extends ZodType {
     return validatedFunc;
   }
   static create(args, returns, params) {
-    return new ZodFunction({
+    return new _ZodFunction({
       args: args ? args : ZodTuple.create([]).rest(ZodUnknown.create()),
       returns: returns || ZodUnknown.create(),
       typeName: ZodFirstPartyTypeKind.ZodFunction,
@@ -3837,7 +3835,7 @@ function createZodEnum(values, params) {
     ...processCreateParams(params)
   });
 }
-var ZodEnum = class extends ZodType {
+var ZodEnum = class _ZodEnum extends ZodType {
   constructor() {
     super(...arguments);
     _ZodEnum_cache.set(this, void 0);
@@ -3893,13 +3891,13 @@ var ZodEnum = class extends ZodType {
     return enumValues;
   }
   extract(values, newDef = this._def) {
-    return ZodEnum.create(values, {
+    return _ZodEnum.create(values, {
       ...this._def,
       ...newDef
     });
   }
   exclude(values, newDef = this._def) {
-    return ZodEnum.create(this.options.filter((opt) => !values.includes(opt)), {
+    return _ZodEnum.create(this.options.filter((opt) => !values.includes(opt)), {
       ...this._def,
       ...newDef
     });
@@ -4268,7 +4266,7 @@ var ZodBranded = class extends ZodType {
     return this._def.type;
   }
 };
-var ZodPipeline = class extends ZodType {
+var ZodPipeline = class _ZodPipeline extends ZodType {
   _parse(input) {
     const { status, ctx } = this._processInputParams(input);
     if (ctx.common.async) {
@@ -4316,7 +4314,7 @@ var ZodPipeline = class extends ZodType {
     }
   }
   static create(a, b) {
-    return new ZodPipeline({
+    return new _ZodPipeline({
       in: a,
       out: b,
       typeName: ZodFirstPartyTypeKind.ZodPipeline
@@ -4757,16 +4755,14 @@ var summarizeAction = {
     const attachments = currentState.recentMessagesData.filter(
       (msg) => msg.content.attachments && msg.content.attachments.length > 0
     ).flatMap((msg) => msg.content.attachments).filter((attachment) => {
-      if (!attachment)
-        return false;
+      if (!attachment) return false;
       return attachmentIds.map((attch) => attch.toLowerCase().slice(0, 5)).includes(attachment.id.toLowerCase().slice(0, 5)) || attachmentIds.some((id) => {
         const attachmentId = id.toLowerCase().slice(0, 5);
         return attachment.id.toLowerCase().includes(attachmentId);
       });
     });
     const attachmentsWithText = attachments.map((attachment) => {
-      if (!attachment)
-        return "";
+      if (!attachment) return "";
       return `# ${attachment.title}
 ${attachment.text}`;
     }).filter((text) => text !== "").join("\n\n");
@@ -4923,12 +4919,10 @@ var getDateRange = async (runtime, message, state) => {
         const match = timeStr.match(
           /^(\d+)\s+(second|minute|hour|day)s?\s+ago$/i
         );
-        if (!match)
-          return null;
+        if (!match) return null;
         const [_, amount, unit] = match;
         const value = Number.parseInt(amount);
-        if (isNaN(value))
-          return null;
+        if (isNaN(value)) return null;
         const multipliers = {
           second: 1e3,
           minute: 60 * 1e3,
@@ -4936,8 +4930,7 @@ var getDateRange = async (runtime, message, state) => {
           day: 24 * 60 * 60 * 1e3
         };
         const multiplier = multipliers[unit.toLowerCase()];
-        if (!multiplier)
-          return null;
+        if (!multiplier) return null;
         return value * multiplier;
       };
       const startTime = parseTimeString(parsedResponse.start);
@@ -5052,8 +5045,7 @@ var summarizeAction2 = {
       const actor = actorMap.get(memory.userId);
       const userName = (actor == null ? void 0 : actor.name) || (actor == null ? void 0 : actor.username) || "Unknown User";
       const attachments = (_a = memory.content.attachments) == null ? void 0 : _a.map((attachment) => {
-        if (!attachment)
-          return "";
+        if (!attachment) return "";
         return `---
 Attachment: ${attachment.id}
 ${attachment.description || ""}
@@ -5234,6 +5226,7 @@ var channelStateProvider = {
 import { Service, ServiceType as ServiceType2 } from "@elizaos/core";
 import { WebClient } from "@slack/web-api";
 var SlackService = class extends Service {
+  client;
   static get serviceType() {
     return ServiceType2.SLACK;
   }
@@ -5251,6 +5244,13 @@ var SlackService = class extends Service {
 
 // src/client.ts
 var SlackClient = class extends EventEmitter {
+  client;
+  runtime;
+  server;
+  messageManager;
+  botUserId;
+  character;
+  signingSecret;
   constructor(runtime) {
     super();
     elizaLogger4.log("\u{1F680} Initializing SlackClient...");
@@ -5258,8 +5258,7 @@ var SlackClient = class extends EventEmitter {
     this.character = runtime.character;
     const token = runtime.getSetting("SLACK_BOT_TOKEN");
     this.signingSecret = runtime.getSetting("SLACK_SIGNING_SECRET");
-    if (!token)
-      throw new Error("SLACK_BOT_TOKEN is required");
+    if (!token) throw new Error("SLACK_BOT_TOKEN is required");
     if (!this.signingSecret)
       throw new Error("SLACK_SIGNING_SECRET is required");
     this.client = new WebClient2(token);
@@ -5351,8 +5350,7 @@ var SlackClient = class extends EventEmitter {
       await slackService.initialize(this.runtime);
       await this.runtime.registerService(slackService);
       const auth = await this.client.auth.test();
-      if (!auth.ok)
-        throw new Error("Failed to authenticate with Slack");
+      if (!auth.ok) throw new Error("Failed to authenticate with Slack");
       this.botUserId = auth.user_id;
       elizaLogger4.debug("\u{1F916} [INIT] Bot info:", {
         user_id: auth.user_id,
@@ -5528,8 +5526,8 @@ var slackPlugin = {
   description: "Slack client plugin",
   clients: [SlackClientInterface]
 };
-var src_default = slackPlugin;
+var index_default = slackPlugin;
 export {
-  src_default as default
+  index_default as default
 };
 //# sourceMappingURL=index.js.map
