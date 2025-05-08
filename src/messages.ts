@@ -42,15 +42,11 @@ export class MessageManager {
             const oneHourAgo = Date.now() - 3600000;
 
             // Clear old processed messages
-<<<<<<< HEAD
-            this.processedMessages.forEach((timestamp, key) => {
-=======
             for (const [key, timestamp] of Array.from(this.processedMessages.entries())) {
->>>>>>> temp-slack-fixes
                 if (timestamp < oneHourAgo) {
                     this.processedMessages.delete(key);
                 }
-            });
+            }
 
             // Clear old processed events
             this.processedEvents.clear();
@@ -250,22 +246,6 @@ export class MessageManager {
                     continue;
                 }
     
-<<<<<<< HEAD
-                // Determine if fileData is a Data URL or text
-                const dataUrlRegex = /^data:image\/\w+;base64,/;
-                const isDataUrl = dataUrlRegex.test(fileData);
-
-                elizaLogger.log("`File` data type check - isDataUrl:", isDataUrl, "Data (first 100 chars):", fileData.substring(0,100));
-                let uploadParams: any;
-
-                if (isDataUrl) {
-                    elizaLogger.log("Uploading image from Data URL...");
-                    const base64Data = fileData.split(',')[1];
-                    const fileBuffer = Buffer.from(base64Data, 'base64');
-                    const mimeType = fileData.substring(fileData.indexOf(':') + 1, fileData.indexOf(';'));
-                    const extension = mimeType.split('/')[1] || 'png'; // Default to png if subtype not found
-                    const filename = `${attachmentId || 'attachment'}.${extension}`;
-=======
                 elizaLogger.debug(`Retrieved fileData for attachmentId: ${attachmentId}. Type: ${typeof fileData}. Preview: ${(fileData || '').substring(0,70)}...`);
                 let uploadParams: any;
 
@@ -293,24 +273,9 @@ export class MessageManager {
                     if (mimeType === 'image/png') extension = 'png';
                     if (mimeType === 'application/pdf') extension = 'pdf';
 
->>>>>>> temp-slack-fixes
-
                     uploadParams = {
                         channels: event.channel,
                         thread_ts: event.thread_ts,
-<<<<<<< HEAD
-                        filename: filename,
-                        initial_comment: "Uploaded image",
-                        file: fileBuffer, // Pass buffer directly
-                    };
-                } else {
-                    // Upload as a text file if not a Data URL
-                    elizaLogger.log("Uploading content as text file (not a Data URL)...");
-                    uploadParams = {
-                        channels: event.channel,
-                        thread_ts: event.thread_ts,
-                        filename: `${attachmentId || 'text_attachment'}.txt`,
-=======
                         filename: `attachment_${attachmentId}.${extension}`,
                         filetype: mimeType, // Provide explicit mimetype
                         file: fileBuffer,
@@ -339,7 +304,6 @@ export class MessageManager {
                         channels: event.channel,
                         thread_ts: event.thread_ts,
                         filename: `text_content_${attachmentId}.txt`,
->>>>>>> temp-slack-fixes
                         filetype: "text/plain",
                         content: fileData, 
                         initial_comment: "",
