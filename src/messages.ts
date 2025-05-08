@@ -42,7 +42,7 @@ export class MessageManager {
             const oneHourAgo = Date.now() - 3600000;
 
             // Clear old processed messages
-            for (const [key, timestamp] of this.processedMessages.entries()) {
+            for (const [key, timestamp] of Array.from(this.processedMessages.entries())) {
                 if (timestamp < oneHourAgo) {
                     this.processedMessages.delete(key);
                 }
@@ -236,7 +236,7 @@ export class MessageManager {
         if (attachments==null || attachments.length==0) {
             return;
         }
-    
+
         for (const attachmentId of attachments) {
             try {
                 // Retrieve file data from the runtime's cache manager.
@@ -246,43 +246,78 @@ export class MessageManager {
                     continue;
                 }
     
-                // Determine if fileData is a file path (image) or text
-                const imageRegex = /\.(png|jpe?g|gif|bmp|tiff|webp)$/i; // Case-insensitive check
-                const isImage = imageRegex.test(fileData);
-                
-                console.log("`File` data:",isImage, fileData);
+                elizaLogger.debug(`Retrieved fileData for attachmentId: ${attachmentId}. Type: ${typeof fileData}. Preview: ${(fileData || '').substring(0,70)}...`);
                 let uploadParams: any;
-    
-                if (isImage) {
-                    // Upload as an image from file path
-                    elizaLogger.log("Uploading image file...");
+
+                const dataUriRegex = /^data:(.+?);base64,(.+)$/i; // More general data URI regex
+
+                const base64Match = fileData.match(dataUriRegex);
+
+                if (base64Match) {
+                    // Case 1: fileData is a Data URI (could be image or other type)
+                    elizaLogger.log(`Detected base64 data URI for attachmentId: ${attachmentId}. Uploading as buffer...`);
+                    const mimeType = base64Match[1]; // e.g., image/jpeg, application/pdf
+                    const base64Data = base64Match[2];
+                    const fileBuffer = Buffer.from(base64Data, 'base64');
+                    
+                    let extension = 'bin'; // Default extension
+                    const mimeParts = mimeType.split('/');
+                    if (mimeParts.length > 1) {
+                        extension = mimeParts[1];
+                        if (extension.includes('+')) { // Handle cases like 'svg+xml' -> 'svg'
+                            extension = extension.split('+')[0];
+                        }
+                    }
+                    // Common known extensions for certain mimetypes Slack might not guess well from buffer alone
+                    if (mimeType === 'image/jpeg') extension = 'jpg';
+                    if (mimeType === 'image/png') extension = 'png';
+                    if (mimeType === 'application/pdf') extension = 'pdf';
+
+
                     uploadParams = {
                         channels: event.channel,
                         thread_ts: event.thread_ts,
-                        filename: '.', // Use attachment ID as filename
-                        initial_comment: "Uploaded image",
-                        file: createReadStream(fileData), // Read file from disk
+                        filename: `attachment_${attachmentId}.${extension}`,
+                        filetype: mimeType, // Provide explicit mimetype
+                        file: fileBuffer,
+                        initial_comment: "", 
+                    };
+
+                } else if (fs.existsSync(fileData)) { 
+                    // Case 2: fileData is an existing file path
+                    elizaLogger.log(`Detected valid file path for attachmentId: ${attachmentId}. Path: ${fileData}. Uploading file content...`);
+                    
+                    const filename = path.basename(fileData) || `attachment_${attachmentId}${path.extname(fileData) || '.dat'}`;
+
+                    uploadParams = {
+                        channels: event.channel,
+                        thread_ts: event.thread_ts,
+                        filename: filename,
+                        file: createReadStream(fileData), 
+                        initial_comment: "",
+                        // Slack will attempt to determine filetype from content/filename.
+                        // For more control, if the original mimetype of the file path was cached, it could be used here.
                     };
                 } else {
-                    // Upload as a text file
-                    elizaLogger.log("Uploading text file...");
+                    // Case 3: fileData is likely direct text content (not a data URI, not a valid path)
+                    elizaLogger.log(`Assuming fileData for attachmentId: ${attachmentId} is direct text content. Uploading as text file...`);
                     uploadParams = {
                         channels: event.channel,
                         thread_ts: event.thread_ts,
-                        filename: "text.txt",
+                        filename: `text_content_${attachmentId}.txt`,
                         filetype: "text/plain",
-                        content: fileData, // Direct text upload
+                        content: fileData, 
                         initial_comment: "",
-                        snippet_type: "markdown"
                     };
                 }
     
-                // Upload file to Slack
+                elizaLogger.debug("Attempting file upload with params for attachmentId:", attachmentId, "Filename:", uploadParams.filename, "Filetype:", uploadParams.filetype || 'auto');
                 const uploadResult = await this.client.filesUploadV2(uploadParams);
-                elizaLogger.log("File uploaded successfully:", uploadResult);
+                const fileId = (uploadResult.file as any)?.id || 'Unknown ID';
+                elizaLogger.log("File uploaded successfully to Slack:", fileId, "for local attachmentId:", attachmentId);
     
             } catch (error) {
-                elizaLogger.error(`Error uploading file for attachment ${attachmentId}:`, error);
+                elizaLogger.error(`Error uploading file to Slack for attachment ${attachmentId}:`, error);
             }
         }
     }
@@ -450,18 +485,26 @@ export class MessageManager {
                                     " Step 12: Executing response callback"
                                 );
 
-                                const messageText = content.text || responseContent.text;
+                                let messageText = content.text || "";
+                                const attachmentIdsForUpload = attachments; 
 
-                                // First, send the main message text
+                                if (attachmentIdsForUpload && attachmentIdsForUpload.length > 0) {
+                                    const dataUriRegexGlobal = /data:image\/(?:png|jpeg|jpg|gif|bmp|tiff|webp);base64,[\w+/=]+/gi;
+                                    messageText = messageText.replace(dataUriRegexGlobal, "").trim();
+                                    elizaLogger.debug("Cleaned messageText after removing base64 strings:", messageText.substring(0,100) + "...");
+                                }
+                                
+                                elizaLogger.debug("Posting message to Slack:", { channel: event.channel, textLength: messageText.length, thread_ts: event.thread_ts });
                                 const result = await this.client.chat.postMessage({
                                     channel: event.channel,
-                                    text: messageText,
+                                    text: messageText, 
                                     thread_ts: event.thread_ts,
                                 });
 
-                                // Then, for each attachment identifier, fetch the file data from the runtime's cache manager
-                                // and upload it using Slack's files.upload method.
-                                await this._uploadAttachments(event, attachments);
+                                if (attachmentIdsForUpload && attachmentIdsForUpload.length > 0) {
+                                    elizaLogger.debug("Starting upload of attachments:", attachmentIdsForUpload);
+                                    await this._uploadAttachments(event, attachmentIdsForUpload);
+                                }
 
                                 elizaLogger.log(
                                     "💾 Step 13: Creating response memory"
