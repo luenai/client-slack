@@ -42,11 +42,11 @@ export class MessageManager {
             const oneHourAgo = Date.now() - 3600000;
 
             // Clear old processed messages
-            for (const [key, timestamp] of this.processedMessages.entries()) {
+            this.processedMessages.forEach((timestamp, key) => {
                 if (timestamp < oneHourAgo) {
                     this.processedMessages.delete(key);
                 }
-            }
+            });
 
             // Clear old processed events
             this.processedEvents.clear();
@@ -246,30 +246,35 @@ export class MessageManager {
                     continue;
                 }
     
-                // Determine if fileData is a file path (image) or text
-                const imageRegex = /\.(png|jpe?g|gif|bmp|tiff|webp)$/i; // Case-insensitive check
-                const isImage = imageRegex.test(fileData);
-                
-                console.log("`File` data:",isImage, fileData);
+                // Determine if fileData is a Data URL or text
+                const dataUrlRegex = /^data:image\/\w+;base64,/;
+                const isDataUrl = dataUrlRegex.test(fileData);
+
+                elizaLogger.log("`File` data type check - isDataUrl:", isDataUrl, "Data (first 100 chars):", fileData.substring(0,100));
                 let uploadParams: any;
-    
-                if (isImage) {
-                    // Upload as an image from file path
-                    elizaLogger.log("Uploading image file...");
+
+                if (isDataUrl) {
+                    elizaLogger.log("Uploading image from Data URL...");
+                    const base64Data = fileData.split(',')[1];
+                    const fileBuffer = Buffer.from(base64Data, 'base64');
+                    const mimeType = fileData.substring(fileData.indexOf(':') + 1, fileData.indexOf(';'));
+                    const extension = mimeType.split('/')[1] || 'png'; // Default to png if subtype not found
+                    const filename = `${attachmentId || 'attachment'}.${extension}`;
+
                     uploadParams = {
                         channels: event.channel,
                         thread_ts: event.thread_ts,
-                        filename: '.', // Use attachment ID as filename
+                        filename: filename,
                         initial_comment: "Uploaded image",
-                        file: createReadStream(fileData), // Read file from disk
+                        file: fileBuffer, // Pass buffer directly
                     };
                 } else {
-                    // Upload as a text file
-                    elizaLogger.log("Uploading text file...");
+                    // Upload as a text file if not a Data URL
+                    elizaLogger.log("Uploading content as text file (not a Data URL)...");
                     uploadParams = {
                         channels: event.channel,
                         thread_ts: event.thread_ts,
-                        filename: "text.txt",
+                        filename: `${attachmentId || 'text_attachment'}.txt`,
                         filetype: "text/plain",
                         content: fileData, // Direct text upload
                         initial_comment: "",
