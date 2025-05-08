@@ -39,14 +39,12 @@ export class MessageManager {
         // Clear old processed messages and events every hour
         setInterval(() => {
             const oneHourAgo = Date.now() - 3600000;
-
             // Clear old processed messages
-            for (const [key, timestamp] of this.processedMessages.entries()) {
+            this.processedMessages.forEach((timestamp, key) => {
                 if (timestamp < oneHourAgo) {
                     this.processedMessages.delete(key);
                 }
-            }
-
+            });
             // Clear old processed events
             this.processedEvents.clear();
         }, 3600000);
@@ -418,25 +416,30 @@ export class MessageManager {
 
                         const callback: HandlerCallback = async (
                             content: Content,
-                            attachments: any[]
+                            attachments: any[] = []
                         ) => {
                             try {
-                                elizaLogger.log(
-                                    " Step 12: Executing response callback"
-                                );
+                                elizaLogger.log("Step 12: Executing response callback");
 
                                 const messageText = content.text || responseContent.text;
 
                                 // First, send the main message text
+                                const blocks = content.attachments?.map(att => ({
+                                    type: 'image',
+                                    image_url: att.url,
+                                    alt_text: att.description || att.title || ''
+                                }));
                                 const result = await this.client.chat.postMessage({
                                     channel: event.channel,
                                     text: messageText,
                                     thread_ts: event.thread_ts,
+                                    blocks: blocks || undefined
                                 });
 
-                                // Then, for each attachment identifier, fetch the file data from the runtime's cache manager
-                                // and upload it using Slack's files.upload method.
-                                await this._uploadAttachments(event, attachments);
+                                // If there are any file IDs to upload (legacy attachments), upload them
+                                if (attachments.length > 0) {
+                                    await this._uploadAttachments(event, attachments);
+                                }
 
                                 elizaLogger.log(
                                     "💾 Step 13: Creating response memory"
