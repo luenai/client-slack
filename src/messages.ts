@@ -424,16 +424,29 @@ export class MessageManager {
                                 const messageText = content.text || responseContent.text;
 
                                 // First, send the main message text
-                                const blocks = content.attachments?.map(att => ({
-                                    type: 'image',
-                                    image_url: att.url,
-                                    alt_text: att.description || att.title || ''
-                                }));
+                                const blocks: any[] = [];
+                                // Add caption text as a section block so it appears in Slack
+                                if (messageText) {
+                                    blocks.push({
+                                        type: 'section',
+                                        text: { type: 'mrkdwn', text: messageText }
+                                    });
+                                }
+                                // Add image blocks for each attachment
+                                if (content.attachments) {
+                                    for (const att of content.attachments) {
+                                        blocks.push({
+                                            type: 'image',
+                                            image_url: att.url,
+                                            alt_text: att.description || att.title || ''
+                                        });
+                                    }
+                                }
                                 const result = await this.client.chat.postMessage({
                                     channel: event.channel,
                                     text: messageText,
                                     thread_ts: event.thread_ts,
-                                    blocks: blocks || undefined
+                                    blocks: blocks.length ? blocks : undefined
                                 });
 
                                 // If there are any file IDs to upload (legacy attachments), upload them

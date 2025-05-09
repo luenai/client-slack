@@ -1,10 +1,8 @@
 
-Debugger attached.
-
+
 > @elizaos-plugins/client-slack@0.25.6-alpha.1 build /Users/yohairosen/Workspace/Projects/luen/a16z/mascott-agent/packages/client-slack
 > tsup src/index.ts --format esm --dts
 
-Debugger attached.
 [34mCLI[39m Building entry: src/index.ts
 [34mCLI[39m Using tsconfig: tsconfig.json
 [34mCLI[39m tsup v6.7.0
@@ -14,9 +12,7 @@ Debugger attached.
 [34mESM[39m Build start
 [32mESM[39m [1mdist/index.js     [22m[32m170.46 KB[39m
 [32mESM[39m [1mdist/index.js.map [22m[32m340.51 KB[39m
-[32mESM[39m ⚡️ Build success in 64ms
+[32mESM[39m ⚡️ Build success in 42ms
 [34mDTS[39m Build start
-[32mDTS[39m ⚡️ Build success in 1143ms
+[32mDTS[39m ⚡️ Build success in 1235ms
 [32mDTS[39m [1mdist/index.d.ts [22m[32m197.00 B[39m
-Waiting for the debugger to disconnect...
-Waiting for the debugger to disconnect...
